@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1
+
+**Fixed**
+
+- An upgrade from an early version no longer stops every command with `Invalid settings: Unrecognized keys: "access_token", "client_secret"`. That version kept its sign-in in the file that now holds the settings. The CLI now reads those two keys as an old sign-in, so it keeps working, and the next `monday login` moves the token to the keychain and removes the keys. Your other settings in the file stay. Any other unknown key is still refused.
+
 ## 2.0.0
 
 The CLI now follows one standard for output, safety, sign-in and installs.

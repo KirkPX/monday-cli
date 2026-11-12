@@ -33,6 +33,56 @@ function parse(value: unknown): Settings {
   throw new ConfigError(`Invalid settings: ${detail}`, `Settings file: ${settingsFilePath()}`);
 }
 
+/**
+ * An early version of this CLI kept its sign-in in this same file, under these
+ * keys. They are not settings: the sign-in code reads them as an old sign-in
+ * (see `readLegacySignIn` in auth.ts), and the next `monday login` or
+ * `monday logout` removes them. Every other unknown key is still refused.
+ */
+export const LEGACY_SIGN_IN_KEYS = ["access_token", "client_secret"] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function withoutLegacy(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const rest = { ...value };
+  for (const key of LEGACY_SIGN_IN_KEYS) delete rest[key];
+  return rest;
+}
+
+function legacyPart(value: unknown): Record<string, unknown> {
+  const part: Record<string, unknown> = {};
+  if (!isRecord(value)) return part;
+  for (const key of LEGACY_SIGN_IN_KEYS) if (key in value) part[key] = value[key];
+  return part;
+}
+
+/** The settings file as written, or null when it is missing or unreadable. Never throws. */
+export function readRawSettings(): unknown {
+  try {
+    return JSON.parse(readFileSync(settingsFilePath(), "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove an early version's sign-in keys from the settings file, and keep every
+ * real setting. The file goes when nothing else is left in it.
+ */
+export function clearLegacySettingsSignIn(): void {
+  const raw = readRawSettings();
+  if (Object.keys(legacyPart(raw)).length === 0) return;
+  const rest = withoutLegacy(raw) as Record<string, unknown>;
+  if (Object.keys(rest).length === 0) {
+    rmSync(settingsFilePath(), { force: true });
+    return;
+  }
+  writeFileAtomic(rest, false);
+}
+
 /** Read and validate the settings file. A missing file means no settings. */
 export function loadSettings(): Settings {
   const path = settingsFilePath();
@@ -52,7 +102,7 @@ export function loadSettings(): Settings {
   } catch {
     throw new ConfigError("The settings file is not valid JSON.", `Settings file: ${path}`);
   }
-  return parse(value);
+  return parse(withoutLegacy(value));
 }
 
 /**
@@ -70,11 +120,17 @@ export function updateSettings(patch: Partial<Settings>): void {
 
 function writeSettings(value: Record<string, unknown>): void {
   const next = parse(value);
+  // Keep an early version's sign-in, so changing a setting does not sign anyone out.
+  const legacy = legacyPart(readRawSettings());
+  writeFileAtomic({ ...next, ...legacy }, Object.keys(legacy).length > 0);
+}
+
+function writeFileAtomic(value: Record<string, unknown>, holdsSecret: boolean): void {
   const path = settingsFilePath();
   const tmp = `${path}.${process.pid}.tmp`;
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n", "utf-8");
+    writeFileSync(tmp, JSON.stringify(value, null, 2) + "\n", { encoding: "utf-8", mode: holdsSecret ? 0o600 : 0o644 });
     renameSync(tmp, path);
   } catch (error) {
     rmSync(tmp, { force: true });

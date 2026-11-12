@@ -324,3 +324,59 @@ describe("a sign-in saved by a version before 2.0", () => {
     expect(readFileSync(credentials, "utf-8")).toContain("good-token");
   });
 });
+
+describe("a sign-in saved in the settings file by an early version", () => {
+  // An early version wrote its token and app secret to the file that now holds the settings.
+  function writeEarly(extra: Record<string, unknown> = {}): string {
+    const file = env.MONDAY_CLI_CONFIG_FILE!;
+    writeFileSync(file, JSON.stringify({ access_token: "good-token", client_secret: "kept-secret", ...extra }));
+    return file;
+  }
+
+  it("keeps working after the update, and never shows the token", async () => {
+    writeEarly();
+    expect((await runCli(["me"], { env })).code).toBe(0);
+    const auth = await runCli(["auth"], { env });
+    expect(auth.code).toBe(0);
+    expect(JSON.parse(auth.stdout)).toMatchObject({ authenticated: true });
+    const doctor = JSON.parse((await runCli(["doctor"], { env })).stdout);
+    expect(doctor.checks.find((c: { name: string }) => c.name === "API key").value).toContain("old sign-in file");
+    const show = await runCli(["config", "show"], { env });
+    expect(show.code).toBe(0);
+    expect(show.stdout + auth.stdout).not.toMatch(/good-token|kept-secret/);
+  });
+
+  it("moves to the store on a plain login, and keeps the real settings", async () => {
+    const file = writeEarly({ timeoutMs: 5000 });
+    expect((await runCli(["login"], { env })).code).toBe(0);
+    expect(readFileSync(credentials, "utf-8")).toContain("good-token");
+    expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ timeoutMs: 5000 });
+  });
+
+  it("removes the file on login when it held nothing else", async () => {
+    const file = writeEarly();
+    await runCli(["login"], { env });
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("survives a settings change, in a private file", async () => {
+    const file = writeEarly();
+    expect((await runCli(["config", "set", "timeoutMs", "5000"], { env })).code).toBe(0);
+    expect(JSON.parse(readFileSync(file, "utf-8"))).toMatchObject({ access_token: "good-token", timeoutMs: 5000 });
+    if (process.platform !== "win32") expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect((await runCli(["me"], { env })).code).toBe(0);
+  });
+
+  it("is removed by logout", async () => {
+    const file = writeEarly({ timeoutMs: 5000 });
+    await runCli(["logout"], { env });
+    expect(JSON.parse(readFileSync(file, "utf-8"))).toEqual({ timeoutMs: 5000 });
+  });
+
+  it("does not excuse any other unknown key", async () => {
+    writeEarly({ readonly: true });
+    const { code, stderr } = await runCli(["me"], { env });
+    expect(code).not.toBe(0);
+    expect(JSON.parse(stderr).message).toContain("readonly");
+  });
+});

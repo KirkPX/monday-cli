@@ -1,5 +1,6 @@
 import { configDir } from "./paths.js";
 import { ConfigError, fileErrorReason } from "./errors.js";
+import { clearLegacySettingsSignIn, readRawSettings } from "./settings.js";
 import { createRequire } from "node:module";
 import {
   chmodSync,
@@ -256,7 +257,7 @@ export function storeLabel(kind: StoreKind): string {
   return "OS keyring";
 }
 
-/** The file versions before 2.0 kept the token in. */
+/** The file versions 1.x kept the token in. */
 export function legacyConfigPath(): string {
   return join(homedir(), ".config", "monday", "config.json");
 }
@@ -267,13 +268,21 @@ export function legacyConfigPath(): string {
  * `monday login` or `monday logout` removes it.
  */
 export function readLegacySignIn(): { accessToken: string | null; clientSecret: string | null } {
+  const text = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null);
+  const field = (data: unknown, key: string) =>
+    typeof data === "object" && data !== null ? text((data as Record<string, unknown>)[key]) : null;
+  let old: unknown = null;
   try {
-    const data = JSON.parse(readFileSync(legacyConfigPath(), "utf-8")) as Record<string, unknown>;
-    const text = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : null);
-    return { accessToken: text(data.access_token), clientSecret: text(data.client_secret) };
+    old = JSON.parse(readFileSync(legacyConfigPath(), "utf-8"));
   } catch {
-    return { accessToken: null, clientSecret: null };
+    // No old file, or one that cannot be read: there is no old sign-in there.
   }
+  // An early version kept the same two keys in the file that now holds the settings.
+  const settings = readRawSettings();
+  return {
+    accessToken: field(old, "access_token") ?? field(settings, "access_token"),
+    clientSecret: field(old, "client_secret") ?? field(settings, "client_secret"),
+  };
 }
 
 /** The account a sign-in belongs to when nobody names one. */
@@ -289,9 +298,13 @@ export function legacyKeyInUse(apiKey: string, account: string): boolean {
   );
 }
 
-/** Remove the old file, whose only contents were the token and the app's secret. */
+/**
+ * Remove an old sign-in: the 1.x file, whose only contents were the token and the
+ * app's secret, and the same two keys in the settings file.
+ */
 export function clearLegacySignIn(): void {
   rmSync(legacyConfigPath(), { force: true });
+  clearLegacySettingsSignIn();
 }
 
 /** Where `monday login --oauth` keeps your Monday app's client secret. */

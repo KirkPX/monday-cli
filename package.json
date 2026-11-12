@@ -1,6 +1,6 @@
 {
   "name": "monday-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Query and manage Monday.com boards, items and activity from the terminal.",
   "type": "module",
