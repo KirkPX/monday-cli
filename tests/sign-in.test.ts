@@ -172,7 +172,7 @@ describe("browser page", () => {
   });
 
   it("refuses a bad token, keeps listening, then saves a good one", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const pending = runBrowserLogin({ accept: (c) => verify(c, "default"), timeoutMs: 10_000 });
 
     let base = "";

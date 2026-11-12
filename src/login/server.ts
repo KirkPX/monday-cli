@@ -123,11 +123,11 @@ export async function runBrowserLogin<T>(opts: BrowserLoginOptions<T>): Promise<
       const url = `http://127.0.0.1:${port}`;
 
       if (openBrowser(url)) {
-        console.log(`Opened ${pc.cyan(url)} in your browser.`);
+        console.error(`Opened ${pc.cyan(url)} in your browser.`);
       } else {
-        console.log(`Open this page to finish signing in: ${pc.cyan(url)}`);
+        console.error(`Open this page to finish signing in: ${pc.cyan(url)}`);
       }
-      console.log(pc.dim("Waiting... (Ctrl+C to cancel)"));
+      console.error(pc.dim("Waiting... (Ctrl+C to cancel)"));
     });
   });
 }

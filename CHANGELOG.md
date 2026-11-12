@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2
+
+**Fixed**
+
+- `monday login --json` at a terminal now prints only JSON on standard output. The browser sign-in's status lines ("Opened …", "Open this page …" and "Waiting…") go to standard error, as the `--oauth` sign-in's lines already did.
+
 ## 2.0.1
 
 **Fixed**

@@ -77,7 +77,7 @@ describe("runBrowserLogin", () => {
 
   /** Reads the served page's nonce, then posts like the browser would. */
   async function drive(accept: (c: string) => Promise<unknown>) {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const pending = runBrowserLogin({ accept: accept as never, timeoutMs: 10_000 });
 
     let base = "";
@@ -99,6 +99,14 @@ describe("runBrowserLogin", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+
+  it("prints its status lines on stderr, never stdout", async () => {
+    const outSpy = vi.spyOn(console, "log");
+    const { pending, base, nonce } = await drive(async () => ({ ok: true }));
+    await post(base, { credential: "c", nonce });
+    await pending;
+    expect(outSpy).not.toHaveBeenCalled();
+  });
 
   it("binds to loopback on an ephemeral port", async () => {
     const { pending, base, nonce } = await drive(async () => ({ ok: true }));
