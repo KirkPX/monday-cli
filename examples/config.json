@@ -1,0 +1,6 @@
+{
+  "baseUrl": "https://api.monday.com",
+  "account": "default",
+  "readOnly": false,
+  "timeoutMs": 600000
+}

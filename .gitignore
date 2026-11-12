@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+*.tgz
+
+# Regenerable introspection dumps (scripts/introspect.mjs)
+docs/api/.schema-*.json
