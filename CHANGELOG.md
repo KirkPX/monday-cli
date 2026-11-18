@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+**Fixed**
+
+- `monday login`, `monday login --status` and `monday me` work again. They asked Monday for the User fields `photo_thumb_small`, `is_admin` and `is_guest`, which Monday removed in API version 2026-10, so the query failed. They now ask for `kind` and `photo_url`.
+- The browser sign-in page shows its messages again. A refused token, or an empty field, used to grey the Connect button for a moment and show nothing.
+
+**Changed**
+
+- `monday me` prints `Role: …` in place of `Admin: Yes/No`. Its JSON gains `kind` and `photo_url` and drops `photo_thumb_small`. `is_admin` and `is_guest` stay, worked out from `kind`.
+
 ## 2.0.2
 
 **Fixed**

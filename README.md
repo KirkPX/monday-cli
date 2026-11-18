@@ -95,7 +95,7 @@ monday boards > boards.json   # JSON when redirected, with no flag
 
 | Command | What it does |
 |---|---|
-| `monday me` | Show who is signed in |
+| `monday me` | Show who is signed in, with their role (`kind`: admin, member, guest or view only) |
 | `monday complexity` | Show the API budget left this minute |
 | `monday boards [--workspace ID] [--search TEXT]` | List boards |
 | `monday inspect BOARD` | Show a board's columns, groups and views |

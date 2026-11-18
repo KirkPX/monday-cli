@@ -122,7 +122,7 @@ function prettyPrintItem(item: Record<string, unknown>): void {
     console.log(`User: ${any.name}`);
     console.log(`Email: ${any.email}`);
     if (any.title) console.log(`Title: ${any.title}`);
-    console.log(`Admin: ${any.is_admin ? "Yes" : "No"}`);
+    if (any.kind) console.log(`Role: ${String(any.kind).replace(/_/g, " ")}`);
     if (any.account?.name) console.log(`Account: ${any.account.name}`);
     return;
   }
