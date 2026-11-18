@@ -48,23 +48,28 @@ export function loginPage(opts: { nonce: string }): string {
 </div>
 
 <script>
+// Everything stays inside this function. A top-level \`var status\` would be the
+// browser's legacy window.status, which turns whatever it is given into a string,
+// so every message written to it would silently vanish.
+(function () {
+  'use strict';
   var NONCE = ${JSON.stringify(opts.nonce)};
   var form = document.getElementById('form');
-  var status = document.getElementById('status');
+  var statusEl = document.getElementById('status');
   var submit = document.getElementById('submit');
 
   form.addEventListener('submit', function (event) {
     event.preventDefault();
     var credential = document.getElementById('credential').value.trim();
     if (!credential) {
-      status.className = 'error';
-      status.textContent = 'Paste your credential first.';
+      statusEl.className = 'error';
+      statusEl.textContent = 'Paste your credential first.';
       return;
     }
 
     submit.disabled = true;
-    status.className = 'progress';
-    status.textContent = 'Checking...';
+    statusEl.className = 'progress';
+    statusEl.textContent = 'Checking...';
 
     fetch('/callback', {
       method: 'POST',
@@ -81,11 +86,12 @@ export function loginPage(opts: { nonce: string }): string {
         throw new Error(result.body.error || 'The CLI rejected that credential.');
       })
       .catch(function (err) {
-        status.className = 'error';
-        status.textContent = err.message + ' Nothing was saved.';
+        statusEl.className = 'error';
+        statusEl.textContent = err.message + ' Nothing was saved.';
         submit.disabled = false;
       });
   });
+})();
 </script>
 </body>
 </html>`;

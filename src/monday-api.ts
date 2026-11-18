@@ -31,17 +31,29 @@ const ITEM_FIELDS = `
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
-export function getMe(client: ApiClient) {
-  return client.query<{ me: any }>(
+// API version 2026-10 removed the User fields photo_*, is_admin, is_guest, is_view_only,
+// is_pending, enabled, is_verified and join_date. Their replacements (kind, photo_url,
+// status, is_email_confirmed, became_active_at) exist from 2026-07. Never select a removed
+// one: the whole query fails, and with it `monday login`.
+export async function getMe(client: ApiClient) {
+  const data = await client.query<{ me: any }>(
     `query {
       me {
-        id name email title photo_thumb_small is_admin is_guest
+        id name email title kind
+        photo_url { thumb_small }
         account { id name }
       }
     }`,
     undefined,
     { operation: "read the signed-in user" }
   );
+  const me = data.me;
+  if (me && typeof me === "object") {
+    // Kept for scripts that read `monday me --json` from before 2026-10.
+    me.is_admin = me.kind === "admin";
+    me.is_guest = me.kind === "guest";
+  }
+  return data;
 }
 
 export async function getComplexity(client: ApiClient): Promise<Complexity> {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
+import vm from "node:vm";
 import { findOpener, openBrowser, openerArgument } from "../src/login/browser.js";
 import { loginPage } from "../src/login/page.js";
 import { runBrowserLogin } from "../src/login/server.js";
@@ -13,7 +14,64 @@ describe("login page", () => {
     // A page that collects a credential must not also load third-party code.
     expect(loginPage({ nonce: "n" })).not.toMatch(/<script[^>]+src=/i);
   });
+
+  it("shows the CLI's error when the credential is refused", async () => {
+    const page = await runPageScript({ status: 400, body: { error: "Monday refused that token." } });
+    await page.submit("typo");
+    expect(page.el.status.className).toBe("error");
+    expect(page.el.status.textContent).toBe("Monday refused that token. Nothing was saved.");
+    expect(page.el.submit.disabled).toBe(false);
+  });
+
+  it("asks for a credential before sending an empty one", async () => {
+    const page = await runPageScript({ status: 200, body: { ok: true } });
+    await page.submit("   ");
+    expect(page.el.status.textContent).toBe("Paste your credential first.");
+    expect(page.fetched).toBe(0);
+  });
 });
+
+/**
+ * Run the page's inline script against a stub DOM. The global has the browser's
+ * legacy `status` property, which turns anything assigned to it into a string, so a
+ * script that keeps its elements in a global named `status` fails here as in Chrome.
+ */
+async function runPageScript(reply: { status: number; body: unknown }) {
+  const script = /<script>([\s\S]*?)<\/script>/.exec(loginPage({ nonce: "n" }))![1]!;
+  const element = () => ({ className: "", textContent: "", innerHTML: "", disabled: false, value: "" });
+  const el: Record<string, ReturnType<typeof element>> = {
+    form: element(), status: element(), submit: element(), credential: element(), card: element(),
+  };
+  let onSubmit: ((event: { preventDefault(): void }) => void) | undefined;
+  (el.form as any).addEventListener = (_: string, handler: typeof onSubmit) => (onSubmit = handler);
+
+  let fetched = 0;
+  const context: Record<string, unknown> = {
+    document: { getElementById: (id: string) => el[id] },
+    fetch: async () => {
+      fetched++;
+      return { ok: reply.status < 300, json: async () => reply.body };
+    },
+  };
+  let legacyStatus = "";
+  Object.defineProperty(context, "status", {
+    get: () => legacyStatus,
+    set: (value: unknown) => (legacyStatus = String(value)),
+  });
+  vm.runInNewContext(script, context);
+
+  return {
+    el,
+    get fetched() {
+      return fetched;
+    },
+    async submit(value: string) {
+      el.credential!.value = value;
+      onSubmit!({ preventDefault() {} });
+      for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+    },
+  };
+}
 
 describe("findOpener", () => {
   // An explicit existence probe, so each platform branch can be asserted from

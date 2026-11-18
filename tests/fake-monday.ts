@@ -3,7 +3,24 @@ import { createServer, type Server } from "node:http";
 export type Call = { path: string; auth: string; query: string; variables: Record<string, any>; body: any };
 export type Reply = { status?: number; body: unknown; headers?: Record<string, string> };
 
-const ME = { me: { id: "1", name: "Test User", email: "t@example.com", is_admin: false, account: { id: "9", name: "Test Co" } } };
+const ME = {
+  me: {
+    id: "1",
+    name: "Test User",
+    email: "t@example.com",
+    title: "",
+    kind: "member",
+    photo_url: { thumb_small: null },
+    account: { id: "9", name: "Test Co" },
+  },
+};
+
+/** User fields Monday removed in API version 2026-10. Asking for one fails the whole query. */
+export const REMOVED_USER_FIELDS = [
+  "photo_original", "photo_small", "photo_thumb", "photo_thumb_small", "photo_tiny",
+  "is_admin", "is_guest", "is_view_only", "is_pending", "enabled", "is_verified", "join_date",
+];
+const REMOVED_USER_FIELD = new RegExp(`\\b(${REMOVED_USER_FIELDS.join("|")})\\b`);
 
 /**
  * A stand-in for Monday on a local port. It records every call, so a test can prove
@@ -32,7 +49,19 @@ export async function fakeMonday(reply: (call: Call) => unknown = () => ({})) {
 
       if (call.path === "/oauth2/token") return send(200, { access_token: "good-token" });
       if (call.auth !== "good-token") return send(401, { errors: ["Not Authenticated"] });
-      if (/\bme\s*\{/.test(call.query)) return send(200, { data: ME });
+      const removed = REMOVED_USER_FIELD.exec(call.query);
+      if (removed) {
+        // What Monday answers since 2026-10: a 200 that holds only errors.
+        return send(200, {
+          errors: [
+            {
+              message: `Cannot query field "${removed[1]}" on type "User".`,
+              extensions: { code: "GRAPHQL_VALIDATION_FAILED" },
+            },
+          ],
+        });
+      }
+      if (/\bme\s*\{/.test(call.query)) return send(200, { data: structuredClone(ME) });
       const answer = reply(call);
       if (answer && typeof answer === "object" && "status" in answer) {
         const r = answer as Reply;

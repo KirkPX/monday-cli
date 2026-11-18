@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Call } from "./fake-monday.js";
-import { fakeMonday } from "./fake-monday.js";
+import { fakeMonday, REMOVED_USER_FIELDS } from "./fake-monday.js";
 import { runCli } from "./run-cli.js";
 
 let dir: string;
@@ -276,7 +276,17 @@ describe("reads", () => {
   it("--pretty from before 2.0 still gives text in a pipe, and is not in the help", async () => {
     const { stdout } = await runCli(["me", "--pretty"], { env });
     expect(stdout).toContain("User: Test User");
+    expect(stdout).toContain("Role: member");
     expect((await runCli(["--help"], { env })).stdout).not.toContain("--pretty");
+  });
+
+  it("me asks for no User field that API version 2026-10 removed", async () => {
+    const { code, stdout } = await runCli(["me"], { env });
+    expect(code).toBe(0);
+    const query = fake.calls.at(-1)!.query;
+    for (const field of REMOVED_USER_FIELDS) expect(query).not.toMatch(new RegExp(`\\b${field}\\b`));
+    // is_admin and is_guest stay in the JSON, worked out from kind, for older scripts.
+    expect(JSON.parse(stdout)).toMatchObject({ kind: "member", is_admin: false, is_guest: false });
   });
 });
 
