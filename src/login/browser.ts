@@ -34,12 +34,12 @@ export function openBrowser(url: string): boolean {
 }
 
 /**
- * The URL as the opener must receive it. Node does not quote an argument with no
- * spaces, so cmd would end the command at the first `&` and drop the rest of the
- * URL. On Windows each `&` needs cmd's escape character.
+ * The URL as the opener must receive it. On Windows the URL goes through
+ * `cmd /c start`, and cmd reads `&`, `|`, `<`, `>` and `^` as its own. Without
+ * escaping, everything after the first `&` in a URL is lost.
  */
 export function openerArgument(url: string, platform: NodeJS.Platform = process.platform): string {
-  return platform === "win32" ? url.replace(/&/g, "^&") : url;
+  return platform === "win32" ? url.replace(/[\^&|<>]/g, "^$&") : url;
 }
 
 /**

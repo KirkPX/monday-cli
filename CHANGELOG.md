@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.3
+
+**Fixed**
+
+- On Windows, the sign-in address given to the browser now escapes all five characters cmd treats as its own (`&`, `|`, `<`, `>` and `^`), not only `&`, so the browser always gets the whole address.
+- The sign-in page answers "Could not read that request" to a body that is valid JSON but not a sign-in, such as `null`, a number or a list, and keeps waiting. Before, it said the page had expired.
+
 ## 2.0.2
 
 **Fixed**

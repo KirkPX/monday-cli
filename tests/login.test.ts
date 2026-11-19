@@ -59,6 +59,7 @@ describe("openerArgument", () => {
   it("escapes & for cmd on Windows, so the whole URL reaches the browser", () => {
     expect(openerArgument("https://a.test/x?a=1&b=2", "win32")).toBe("https://a.test/x?a=1^&b=2");
     expect(openerArgument("https://a.test/x?a=1&b=2", "darwin")).toBe("https://a.test/x?a=1&b=2");
+    expect(openerArgument("a|b<c>d^e", "win32")).toBe("a^|b^<c^>d^^e");
   });
 });
 
@@ -131,10 +132,14 @@ describe("runBrowserLogin", () => {
     await pending;
   });
 
-  it("answers a body of null instead of crashing", async () => {
-    const { pending, base, nonce } = await drive(async () => ({ ok: true }));
-    expect((await post(base, null)).status).toBe(403);
-    await post(base, { credential: "c", nonce });
+  it("answers 400 to a body that is valid JSON but not an object, and keeps listening", async () => {
+    const accept = vi.fn().mockResolvedValue({ ok: true });
+    const { pending, base, nonce } = await drive(accept);
+    for (const body of [null, 7, ["x"]]) {
+      expect((await post(base, body)).status).toBe(400);
+    }
+    expect(accept).not.toHaveBeenCalled();
+    expect((await post(base, { credential: "c", nonce })).status).toBe(200);
     await pending;
   });
 
